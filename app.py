@@ -312,8 +312,25 @@ def get_gsheet_client():
         return None
 
 
-def get_spreadsheet_url() -> str:
+def get_admin_sheet_url() -> str:
     return st.secrets.get("SPREADSHEET_URL", "")
+
+
+def log_analytics(client, admin_url: str, event: str):
+    """Log anonymous usage to the developer's admin sheet."""
+    if not client or not admin_url:
+        return
+    try:
+        spreadsheet = client.open_by_url(admin_url)
+        try:
+            ws = spreadsheet.worksheet("Analytics")
+        except gspread.exceptions.WorksheetNotFound:
+            ws = spreadsheet.add_worksheet(title="Analytics", rows=1000, cols=3)
+            ws.append_row(["Timestamp", "Event"])
+        
+        ws.append_row([datetime.datetime.now().isoformat(), event])
+    except Exception:
+        pass  # Fail silently for analytics
 
 
 def load_sheet(client, url: str) -> tuple[pd.DataFrame, list[str]]:
@@ -382,16 +399,55 @@ with st.expander("ℹ️ How to Use (Click to expand)"):
 
 # ── Connection Check ─────────────────────────────────────────────────────────
 gs_client = get_gsheet_client()
-sheet_url = get_spreadsheet_url()
+admin_url = get_admin_sheet_url()
 
 config_ok = True
-if not gs_client or not sheet_url:
+if not gs_client:
     st.error("""
-    **⚠️ Missing Credentials!**  
-    - **Running Locally?** Make sure your `.streamlit/secrets.toml` file exists and is configured correctly.
-    - **Running on Streamlit Cloud?** You need to paste the exact contents of your `secrets.toml` into the **App Settings > Secrets** box on the Streamlit dashboard online.
+    **⚠️ App Configuration Error!**  
+    The developer has not configured the Google Service Account correctly.
     """)
     config_ok = False
+    st.stop()
+
+# ── User Setup (BYO Sheet) ───────────────────────────────────────────────────
+if "user_sheet_url" not in st.session_state:
+    st.markdown("### 🛠️ Welcome! Setup Your Tracker")
+    st.info("To keep your data 100% private, you need to connect your own Google Sheet.")
+    
+    st.markdown("""
+    **Follow these 3 easy steps:**
+    1. Create a new, blank [Google Sheet](https://sheets.new)
+    2. Click **Share** (top right) and share it as an **Editor** with this exact email:
+    """)
+    
+    bot_email = "job-tracker-bot@..."
+    try:
+        bot_email = st.secrets["gcp_service_account"]["client_email"]
+    except:
+        pass
+        
+    st.code(bot_email, language=None)
+    st.markdown("3. Copy the URL of your Google Sheet and paste it below:")
+    
+    user_url = st.text_input("Your Google Sheet URL", placeholder="https://docs.google.com/spreadsheets/d/...")
+    
+    if st.button("Connect & Start Tracking", type="primary"):
+        if not user_url.startswith("http"):
+            st.warning("Please enter a valid URL.")
+        else:
+            with st.spinner("Connecting..."):
+                try:
+                    # Test connection
+                    ws = gs_client.open_by_url(user_url).worksheet("Sheet1")
+                    st.session_state["user_sheet_url"] = user_url
+                    log_analytics(gs_client, admin_url, "User Connected")
+                    st.rerun()
+                except Exception as e:
+                    st.error("Could not connect. Did you share it with the email address above as an Editor?")
+    st.stop()
+
+sheet_url = st.session_state["user_sheet_url"]
 
 # ── Load sheet data (dynamic columns) ────────────────────────────────────────
 df = pd.DataFrame()
@@ -517,6 +573,7 @@ with tab_manual:
             }
             with st.spinner("Saving..."):
                 if append_to_sheet(gs_client, sheet_url, manual, sheet_headers):
+                    log_analytics(gs_client, admin_url, "Job Logged")
                     st.success("Saved to Google Sheets!")
                     st.balloons()
                     st.cache_resource.clear()
@@ -556,6 +613,7 @@ if "extracted" in st.session_state:
             else:
                 with st.spinner("Saving..."):
                     if append_to_sheet(gs_client, sheet_url, ex, sheet_headers):
+                        log_analytics(gs_client, admin_url, "Job Logged")
                         st.success("Saved to Google Sheets!")
                         st.balloons()
                         del st.session_state["extracted"]
