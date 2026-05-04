@@ -316,7 +316,7 @@ def get_admin_sheet_url() -> str:
     return st.secrets.get("SPREADSHEET_URL", "")
 
 
-def log_analytics(client, admin_url: str, event: str):
+def log_analytics(client, admin_url: str, event: str, user_id: str = "Unknown"):
     """Log anonymous usage to the developer's admin sheet."""
     if not client or not admin_url:
         return
@@ -326,9 +326,9 @@ def log_analytics(client, admin_url: str, event: str):
             ws = spreadsheet.worksheet("Analytics")
         except gspread.exceptions.WorksheetNotFound:
             ws = spreadsheet.add_worksheet(title="Analytics", rows=1000, cols=3)
-            ws.append_row(["Timestamp", "Event"])
+            ws.append_row(["Timestamp", "User Identifier", "Event"])
         
-        ws.append_row([datetime.datetime.now().isoformat(), event])
+        ws.append_row([datetime.datetime.now().isoformat(), user_id, event])
     except Exception:
         pass  # Fail silently for analytics
 
@@ -431,6 +431,7 @@ if "user_sheet_url" not in st.session_state:
     st.markdown("3. Copy the URL of your Google Sheet and paste it below:")
     
     user_url = st.text_input("Your Google Sheet URL", placeholder="https://docs.google.com/spreadsheets/d/...")
+    user_id = st.text_input("Your Name or Identifier (Optional)", placeholder="e.g., John Doe")
     
     if st.button("Connect & Start Tracking", type="primary"):
         if not user_url.startswith("http"):
@@ -441,7 +442,8 @@ if "user_sheet_url" not in st.session_state:
                     # Test connection
                     ws = gs_client.open_by_url(user_url).worksheet("Sheet1")
                     st.session_state["user_sheet_url"] = user_url
-                    log_analytics(gs_client, admin_url, "User Connected")
+                    st.session_state["user_id"] = user_id if user_id else "Anonymous"
+                    log_analytics(gs_client, admin_url, "User Connected", st.session_state["user_id"])
                     st.rerun()
                 except Exception as e:
                     st.error("Could not connect. Did you share it with the email address above as an Editor?")
@@ -573,7 +575,7 @@ with tab_manual:
             }
             with st.spinner("Saving..."):
                 if append_to_sheet(gs_client, sheet_url, manual, sheet_headers):
-                    log_analytics(gs_client, admin_url, "Job Logged")
+                    log_analytics(gs_client, admin_url, "Job Logged", st.session_state.get("user_id", "Anonymous"))
                     st.success("Saved to Google Sheets!")
                     st.balloons()
                     st.cache_resource.clear()
@@ -613,7 +615,7 @@ if "extracted" in st.session_state:
             else:
                 with st.spinner("Saving..."):
                     if append_to_sheet(gs_client, sheet_url, ex, sheet_headers):
-                        log_analytics(gs_client, admin_url, "Job Logged")
+                        log_analytics(gs_client, admin_url, "Job Logged", st.session_state.get("user_id", "Anonymous"))
                         st.success("Saved to Google Sheets!")
                         st.balloons()
                         del st.session_state["extracted"]

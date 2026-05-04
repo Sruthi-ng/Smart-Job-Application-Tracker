@@ -12,11 +12,10 @@ An AI-powered web application that extracts structured data from job description
 
 ## What It Does
 
-1. **Paste** a job description from any website (or upload a PDF/DOCX/TXT file)
-2. **AI extracts** the company name, job title, job ID, and other details automatically
-3. **Review & edit** the results, enter your name, and click Save
-4. **Data is logged** to a shared Google Sheet — accessible from anywhere
-5. **Dashboard** shows all applications with KPI cards (total, applied, interviews, offers)
+1. **Privacy First (Bring Your Own Sheet)**: Users provide their own Google Sheet URL when they open the app. Their data is saved securely to their personal sheet, keeping applications 100% private.
+2. **AI Extraction**: Users paste a job description (or upload a PDF/DOCX/TXT). AI extracts the company name, job title, job ID, and other details automatically.
+3. **Developer Analytics**: While user data remains private, the app logs usage metrics (Timestamp, User Identifier, Event) to a hidden Admin Google Sheet so the developer can track app usage.
+4. **Dashboard**: The user's dashboard shows all their applications with KPI cards (total, applied, interviews, offers).
 
 > If AI is unavailable (quota exceeded, offline), the app automatically falls back to local regex extraction — it always works.
 
@@ -192,8 +191,16 @@ smart-job-tracker/
 
 ## Architecture
 
-```
+This app uses a **Multi-Tenant BYO-Sheet** architecture:
+
+1. **Admin Database**: Configured in `.streamlit/secrets.toml`. Used purely for logging usage analytics (a new `Analytics` tab is created automatically).
+2. **User Database**: Configured at runtime via the UI. End-users create and connect their own Google Sheet. Their extracted job data goes *only* to their sheet.
+
+```text
 User (Browser)
+     │
+     ├── 1. Connects personal Google Sheet URL
+     ├── 2. Pastes Job Description
      │
      ▼
 Streamlit App (app.py)
@@ -201,8 +208,9 @@ Streamlit App (app.py)
      ├──► Google Gemini API ──► Structured JSON
      │    (fallback: regex)
      │
-     └──► Google Sheets API ──► Read/Write rows
-                                (shared database)
+     ├──► User's Google Sheet ──► Reads/Writes Job Data (100% Private)
+     │
+     └──► Admin Google Sheet ──► Appends to `Analytics` tab (Usage Tracking)
 ```
 
 ---
