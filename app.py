@@ -46,7 +46,10 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-html, body, [class*="st-"] { font-family: 'Inter', sans-serif; }
+html, body { font-family: 'Inter', sans-serif; }
+/* Make sure we don't override Streamlit's internal icon fonts */
+.stMarkdown, .stText, .stButton { font-family: 'Inter', sans-serif; }
+
 .main .block-container { padding-top: 1.5rem; max-width: 1000px; }
 
 .hero {
@@ -385,12 +388,8 @@ config_ok = True
 if not gs_client or not sheet_url:
     st.error("""
     **⚠️ Missing Credentials!**  
-    If you are running this on Streamlit Community Cloud, you need to add your secrets:
-    1. Go to [share.streamlit.io](https://share.streamlit.io/)
-    2. Click the 3 dots (**...**) next to your app and select **Settings**
-    3. Click on **Secrets** on the left menu
-    4. Paste the exact contents of your local `.streamlit/secrets.toml` file into the large text box.
-    5. Click **Save** and wait 10 seconds for the app to reload.
+    - **Running Locally?** Make sure your `.streamlit/secrets.toml` file exists and is configured correctly.
+    - **Running on Streamlit Cloud?** You need to paste the exact contents of your `secrets.toml` into the **App Settings > Secrets** box on the Streamlit dashboard online.
     """)
     config_ok = False
 
