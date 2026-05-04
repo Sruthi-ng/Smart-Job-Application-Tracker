@@ -36,7 +36,6 @@ st.set_page_config(
     page_title="Smart Job Tracker",
     page_icon=":briefcase:",
     layout="wide",
-    initial_sidebar_state="expanded",
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -80,12 +79,9 @@ html, body, [class*="st-"] { font-family: 'Inter', sans-serif; }
 .stTabs [data-baseweb="tab-list"] { gap: 8px; }
 .stTabs [data-baseweb="tab"]      { border-radius:8px; padding:8px 16px; font-weight:600; }
 
-/* Sidebar styling */
-[data-testid="stSidebar"] { background: linear-gradient(180deg,#1e1b4b,#312e81); }
-[data-testid="stSidebar"] * { color:#e0e7ff!important; }
-[data-testid="stSidebar"] .stMarkdown h1,
-[data-testid="stSidebar"] .stMarkdown h2,
-[data-testid="stSidebar"] .stMarkdown h3 { color:#c7d2fe!important; }
+/* Sidebar styling (hidden but just in case) */
+[data-testid="collapsedControl"] { display: none !important; }
+[data-testid="stSidebar"] { display: none !important; }
 
 .help-box {
     background: rgba(255,255,255,.05); border-radius: 10px;
@@ -360,46 +356,6 @@ def append_to_sheet(client, url: str, data: dict, headers: list[str]) -> bool:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-#  SIDEBAR — How to Use (for end users)
-# ═════════════════════════════════════════════════════════════════════════════
-
-with st.sidebar:
-    st.markdown("## How to Use")
-    st.markdown("""
-<div class="help-box">
-
-**Step 1** — Copy a job description from any website
-
-**Step 2** — Paste it in the "Paste Job Description" tab
-
-**Step 3** — Click "Analyse" and review the extracted details
-
-**Step 4** — Enter your name and click "Save"
-
-That's it! Your application is logged in Google Sheets and visible in the dashboard below.
-
-</div>
-""", unsafe_allow_html=True)
-
-    st.markdown("### Other Options")
-    st.markdown("""
-- **Upload a File** — PDF, DOCX, or TXT
-- **Enter Manually** — Type details by hand
-""")
-
-    st.divider()
-    st.markdown("### About")
-    st.markdown("""
-This app uses AI to extract job details from unstructured text.
-If AI is unavailable, it falls back to local extraction automatically.
-
-All data is stored in Google Sheets — accessible from anywhere.
-""")
-    st.divider()
-    st.caption("Built by WillowVibe Digital Solutions")
-
-
-# ═════════════════════════════════════════════════════════════════════════════
 #  MAIN UI
 # ═════════════════════════════════════════════════════════════════════════════
 
@@ -411,16 +367,31 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+with st.expander("ℹ️ How to Use (Click to expand)"):
+    st.markdown("""
+    **Step 1** — Copy a job description from any website  
+    **Step 2** — Paste it in the "Paste Job Description" tab below  
+    **Step 3** — Click "Analyse" and review the extracted details  
+    **Step 4** — Enter your name and click "Save"  
+    
+    *If AI is unavailable, the app will automatically fall back to local extraction.*
+    """)
+
 # ── Connection Check ─────────────────────────────────────────────────────────
 gs_client = get_gsheet_client()
 sheet_url = get_spreadsheet_url()
 
 config_ok = True
-if not gs_client:
-    st.warning("Google Sheets is not connected. Configure [gcp_service_account] in .streamlit/secrets.toml")
-    config_ok = False
-if not sheet_url:
-    st.warning("No SPREADSHEET_URL in .streamlit/secrets.toml")
+if not gs_client or not sheet_url:
+    st.error("""
+    **⚠️ Missing Credentials!**  
+    If you are running this on Streamlit Community Cloud, you need to add your secrets:
+    1. Go to [share.streamlit.io](https://share.streamlit.io/)
+    2. Click the 3 dots (**...**) next to your app and select **Settings**
+    3. Click on **Secrets** on the left menu
+    4. Paste the exact contents of your local `.streamlit/secrets.toml` file into the large text box.
+    5. Click **Save** and wait 10 seconds for the app to reload.
+    """)
     config_ok = False
 
 # ── Load sheet data (dynamic columns) ────────────────────────────────────────
@@ -454,6 +425,14 @@ if config_ok and not df.empty:
 
     st.markdown("#### Application Log")
     st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Download Data as CSV",
+        data=csv,
+        file_name="job_applications.csv",
+        mime="text/csv",
+    )
 
 elif config_ok:
     st.info("No applications logged yet. Add one below to get started!")
