@@ -1,0 +1,8 @@
+# Smart Job Application Tracker — Dependencies
+streamlit>=1.30.0
+pandas>=2.0.0
+PyPDF2>=3.0.0
+python-docx>=1.0.0
+gspread>=6.0.0
+google-auth>=2.25.0
+google-genai>=1.0.0
